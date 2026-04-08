@@ -155,6 +155,27 @@ app.put('/api/admin/users/:id/role', requireAdmin, async (req, res) => {
   }
 });
 
+app.post('/api/admin/users', requireAdmin, async (req, res) => {
+  const { name, email, password, role } = req.body;
+  if (!name || !email || !password || !role) return res.status(400).json({ error: 'Missing fields' });
+
+  try {
+    const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (existingUser.rows.length > 0) return res.status(400).json({ error: 'User already exists' });
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const newUser = await pool.query(
+      'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id',
+      [name, email, passwordHash, role]
+    );
+
+    res.json({ success: true, id: newUser.rows[0].id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Creation failed' });
+  }
+});
+
 // Serve frontend in production
 if (process.env.NODE_ENV === 'production') {
   const distPath = path.join(__dirname, '../dist');

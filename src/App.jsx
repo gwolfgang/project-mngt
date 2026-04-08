@@ -3305,22 +3305,48 @@ export default function App() {
       viewer: ["dashboard", "analytics"],
     };
 
-    const createAdminUser = () => {
-      if (!newUserDraft.name || !newUserDraft.email) return;
-      const stamp = Math.floor(Math.random() * 9000 + 1000);
-      setAdminUsers((prev) => [
-        {
-          id: `pu-${stamp}`,
-          name: newUserDraft.name,
-          email: newUserDraft.email,
-          username: newUserDraft.username || `user${stamp}`,
-          role: newUserDraft.role,
-          status: "Active",
-          lastActive: "Just now",
-        },
-        ...prev,
-      ]);
-      setNewUserDraft({ name: "", email: "", username: "", password: "", role: "viewer" });
+    const createAdminUser = async () => {
+      if (!newUserDraft.name || !newUserDraft.email || !newUserDraft.password) {
+        alert("Name, email, and password are required.");
+        return;
+      }
+      try {
+        const res = await fetch('/api/admin/users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            name: newUserDraft.name,
+            email: newUserDraft.email,
+            password: newUserDraft.password,
+            role: newUserDraft.role
+          })
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          setAdminUsers((prev) => [
+            {
+              id: data.id,
+              name: newUserDraft.name,
+              email: newUserDraft.email,
+              role: newUserDraft.role,
+              status: "Active",
+              lastActive: "Just now",
+            },
+            ...prev,
+          ]);
+          setNewUserDraft({ name: "", email: "", username: "", password: "", role: "viewer" });
+          setAdminView("users");
+        } else {
+          const err = await res.json();
+          alert(`Failed to create user: ${err.error}`);
+        }
+      } catch (e) {
+        console.error("User creation failed", e);
+      }
     };
 
     const deleteAdminUser = (userId) => {
