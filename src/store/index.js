@@ -2,6 +2,12 @@ import { create } from 'zustand';
 import { initialNodesConfig, initialEdgesConfig, initialVendors, initialCreativeReviewItems, initialCreativeReviewNotes, initialAdminUsers } from '../data/mockData';
 
 export const useStore = create((set, get) => ({
+  // Auth State
+  authToken: null,
+  authUser: null,
+  setAuthToken: (token, user) => set({ authToken: token, authUser: user }),
+  logout: () => set({ authToken: null, authUser: null }),
+
   // App State
   activeSection: "dashboard",
   setActiveSection: (section) => set({ activeSection: section }),

@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import Papa from "papaparse";
 import { AssetBadge } from "./components/ui/AssetBadge";
 import { CreativeMockPreview } from "./components/ui/CreativeMockPreview";
+import { Login } from "./components/ui/Login";
+import { useStore } from "./store";
 import {
   CheckCircle2,
   Circle,
@@ -538,6 +540,7 @@ function SidebarButton({ item, active, onClick, badge }) {
 }
 
 export default function App() {
+  const authToken = useStore((state) => state.authToken);
   const [activeSection, setActiveSection] = useState("dashboard");
   const [nodes, setNodes] = useState(() => {
     try {
@@ -3596,6 +3599,10 @@ export default function App() {
         return renderDashboard();
     }
   };
+
+  if (!authToken) {
+    return <Login />;
+  }
 
   return (
     <div className="min-h-screen bg-[#06162b] text-slate-100">
