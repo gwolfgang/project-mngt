@@ -1,0 +1,37 @@
+const renderTasks = () => {
+    const taskRows = filteredNodes.flatMap((node) =>
+      node.tasks.map((task) => ({ node, task, assignee: findMember(task.assigneeId) }))
+    );
+    const selectedNodeForTaskCenter = filteredNodes[0] || nodes[0];
+
+    return (
+      <div>
+        <SectionHeader
+          eyebrow="Execution Layer"
+          title="Task Center"
+          description="Add tasks, assign owners, track completion percentages, and manage work by node, assignee, or project."
+        />
+        <div className="mb-5 flex flex-wrap gap-3">
+          <button onClick={() => { setTaskCenterMode(taskCenterMode === "new" ? "none" : "new"); setTaskDraft((prev) => ({ ...prev, nodeId: selectedNodeForTaskCenter?.id || "", assigneeId: prev.assigneeId || "u2" })); }} className="rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-xs text-cyan-200"><Plus className="mr-2 inline h-4 w-4" />New Task</button>
+          <button onClick={() => setTaskCenterMode(taskCenterMode === "assign" ? "none" : "assign")} className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs text-slate-300"><UserPlus className="mr-2 inline h-4 w-4" />Assign User</button>
+          <button onClick={() => setTaskCenterMode(taskCenterMode === "dates" ? "none" : "dates")} className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs text-slate-300"><Clock3 className="mr-2 inline h-4 w-4" />Due Dates</button>
+          <button onClick={() => setTaskCenterMode(taskCenterMode === "comments" ? "none" : "comments")} className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs text-slate-300"><MessageSquare className="mr-2 inline h-4 w-4" />Comments</button>
+        </div>
+
+        {taskCenterMode !== "none" ? (
+          <div className="mb-5 rounded-3xl border border-cyan-400/15 bg-slate-950/55 p-5 shadow-2xl">
+            {taskCenterMode === "new" ? (
+              <div>
+                <div className="mb-3 text-[10px] uppercase tracking-[0.35em] text-cyan-300">Create Task</div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <select value={taskDraft.nodeId} onChange={(e) => setTaskDraft((prev) => ({ ...prev, nodeId: e.target.value }))} className="rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-white outline-none">
+                    {filteredNodes.map((node) => <option key={node.id} value={node.id}>{node.title}</option>)}
+                  </select>
+                  <input value={taskDraft.text} onChange={(e) => setTaskDraft((prev) => ({ ...prev, text: e.target.value }))} className="rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-white outline-none xl:col-span-2" placeholder="Task name" />
+                  <select value={taskDraft.assigneeId} onChange={(e) => setTaskDraft((prev) => ({ ...prev, assigneeId: e.target.value }))} className="rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-white outline-none">
+                    {teamMembers.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+                  </select>
+                  <input type="date" value={taskDraft.dueDate} onChange={(e) => setTaskDraft((prev) => ({ ...prev, dueDate: e.target.value }))} className="rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-white outline-none" />
+                </div>
+                <div className="mt-4 flex gap-2">
+            
