@@ -591,7 +591,7 @@ export default function App() {
     cellthena: { startDate: "2026-04-10", goalDate: "2026-06-15" },
     cellforge: { startDate: "2026-04-12", goalDate: "2026-06-18" },
   });
-  const [currentUserId, setCurrentUserId] = useState("u4");
+  const [adminView, setAdminView] = useState("users");
   const [adminUsers, setAdminUsers] = useState([]);
   
   // Real DB Fetch logic for admin
@@ -1076,7 +1076,7 @@ export default function App() {
         title: asset.name,
         assetType: asset.type === "image" ? "Design" : "Document",
         status: "in_review",
-        ownerId: currentUserId,
+        ownerId: authUser?.id,
         version: "v1.0",
         thumbnail: asset.name,
         description: "Sent from Asset Library",
@@ -2834,13 +2834,13 @@ export default function App() {
   };
 
   const setCreativeDecision = (itemId, decision) => {
-    const noteKey = `${itemId}-${currentUserId}`;
+    const noteKey = `${itemId}-${authUser?.id}`;
     const note = creativeReviewDrafts[noteKey] || creativeReviewNotes[noteKey] || "";
     setCreativeReviewItems((prev) =>
       prev.map((item) => {
         if (item.id !== itemId) return item;
-        const existing = item.approvals.filter((entry) => entry.userId !== currentUserId);
-        const nextApprovals = [...existing, { userId: currentUserId, decision, note }];
+        const existing = item.approvals.filter((entry) => entry.userId !== authUser?.id);
+        const nextApprovals = [...existing, { userId: authUser?.id, decision, note }];
         const decisions = nextApprovals.map((entry) => entry.decision);
         const nextStatus = decisions.includes("changes_requested")
           ? "changes_requested"
@@ -2935,7 +2935,7 @@ export default function App() {
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             {scopedItems.map((item) => {
               const linkedAsset = assetIndex[item.assetId];
-              const noteKey = `${item.id}-${currentUserId}`;
+              const noteKey = `${item.id}-${authUser?.id}`;
               const currentNote = creativeReviewDrafts[noteKey] ?? creativeReviewNotes[noteKey] ?? "";
               const decisionCounts = item.approvals.reduce(
                 (acc, entry) => {
@@ -3031,7 +3031,7 @@ export default function App() {
             </div>
             {scopedItems.map((item) => {
               const linkedAsset = assetIndex[item.assetId];
-              const noteKey = `${item.id}-${currentUserId}`;
+              const noteKey = `${item.id}-${authUser?.id}`;
               const currentNote = creativeReviewDrafts[noteKey] ?? creativeReviewNotes[noteKey] ?? "";
               return (
                 <div key={item.id} className="grid grid-cols-[1.2fr_0.8fr_0.7fr_0.8fr_1fr] items-start border-b border-slate-800 px-5 py-4 last:border-b-0">
