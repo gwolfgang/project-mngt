@@ -540,7 +540,7 @@ function SidebarButton({ item, active, onClick, badge }) {
 }
 
 export default function App() {
-  const authToken = useStore((state) => state.authToken);
+  const { authToken, authUser } = useStore();
   const [activeSection, setActiveSection] = useState("dashboard");
   const [nodes, setNodes] = useState(() => {
     try {
@@ -592,14 +592,17 @@ export default function App() {
     cellforge: { startDate: "2026-04-12", goalDate: "2026-06-18" },
   });
   const [currentUserId, setCurrentUserId] = useState("u4");
-  const [adminView, setAdminView] = useState("users");
-  const [adminUsers, setAdminUsers] = useState([
-    { id: "pu1", name: "Sarah Connor", email: "sarah.c@mkos.ai", username: "sconnor", role: "admin", status: "Active", lastActive: "Just now" },
-    { id: "pu2", name: "John Doe", email: "john.d@mkos.ai", username: "jdoe", role: "manager", status: "Active", lastActive: "2h ago" },
-    { id: "pu3", name: "Jane Smith", email: "jane.s@mkos.ai", username: "jsmith", role: "contributor", status: "Offline", lastActive: "1d ago" },
-    { id: "pu4", name: "Mike Ross", email: "mike.r@mkos.ai", username: "mross", role: "viewer", status: "Inactive", lastActive: "5d ago" },
-    { id: "pu5", name: "Eliza Beta", email: "eliza.b@mkos.ai", username: "ebeta", role: "viewer", status: "Active", lastActive: "3h ago" },
-  ]);
+  const [adminUsers, setAdminUsers] = useState([]);
+  
+  // Real DB Fetch logic for admin
+  useEffect(() => {
+    if (activeSection === "admin" && (authUser?.role === "admin" || authUser?.role === "owner")) {
+      fetch('/api/admin/users', { headers: { Authorization: `Bearer ${authToken}` } })
+        .then(r => r.json())
+        .then(data => { if (data.users) setAdminUsers(data.users); })
+        .catch(console.error);
+    }
+  }, [activeSection, authUser, authToken]);
   const [newUserDraft, setNewUserDraft] = useState({
     name: "",
     email: "",
@@ -3275,7 +3278,7 @@ export default function App() {
   );
 
   const renderAdmin = () => {
-    const currentUser = teamMembers.find((m) => m.id === currentUserId);
+    const currentUser = authUser;
     const isAdminUser = currentUser?.role === "admin" || currentUser?.role === "owner";
     const roleCounts = {
       admin: adminUsers.filter((u) => u.role === "admin").length,
@@ -3324,15 +3327,33 @@ export default function App() {
       setAdminUsers((prev) => prev.filter((user) => user.id !== userId));
     };
 
-    const cycleUserRole = (userId) => {
+    const cycleUserRole = async (userId) => {
       const order = ["viewer", "contributor", "manager", "admin"];
-      setAdminUsers((prev) =>
-        prev.map((user) => {
-          if (user.id !== userId) return user;
-          const idx = order.indexOf(user.role);
-          return { ...user, role: order[(idx + 1) % order.length] };
-        })
-      );
+      const user = adminUsers.find(u => u.id === userId);
+      if (!user) return;
+      const idx = order.indexOf(user.role);
+      const newRole = order[(idx + 1) % order.length] || "viewer";
+
+      try {
+        const res = await fetch(`/api/admin/users/${userId}/role`, {
+          method: 'PUT',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ role: newRole })
+        });
+        if (res.ok) {
+          setAdminUsers((prev) =>
+            prev.map((u) => {
+              if (u.id !== userId) return u;
+              return { ...u, role: newRole };
+            })
+          );
+        }
+      } catch (err) {
+        console.error("Failed to cycle role", err);
+      }
     };
 
     if (!isAdminUser) {
@@ -3669,7 +3690,7 @@ export default function App() {
             <div className="space-y-2">
               {appSections
                 .filter((item) => {
-                  const currentUserRole = teamMembers.find(m => m.id === currentUserId)?.role;
+                  const currentUserRole = authUser?.role;
                   return item.id !== "admin" || currentUserRole === "admin" || currentUserRole === "owner";
                 })
                 .map((item) => (
@@ -3689,23 +3710,17 @@ export default function App() {
             </div>
 
             <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
-              <div className="mb-3 flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-slate-500">
-                <Shield className="h-4 w-4 text-cyan-300" /> Access Snapshot
+              <div className="mb-3 flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-cyan-300">
+                <Shield className="h-4 w-4" /> Live Session
               </div>
               <div className="space-y-2">
-                {teamMembers.map((member) => (
-                  <button 
-                    key={member.id} 
-                    onClick={() => setCurrentUserId(member.id)}
-                    className={cls("flex items-center justify-between rounded-xl border px-3 py-2 w-full text-left transition-colors cursor-pointer", currentUserId === member.id ? "border-cyan-400 bg-cyan-400/10 text-cyan-50" : "border-slate-800 bg-slate-950/70 hover:border-slate-700")}
-                  >
-                    <div>
-                      <div className="text-sm font-medium">{member.name}</div>
-                      <div className={cls("text-xs", currentUserId === member.id ? "text-cyan-200/70" : "text-slate-500")}>{member.email}</div>
-                    </div>
-                    <div className={cls("max-w-[120px] truncate rounded-full border px-2 py-1 text-[10px] uppercase tracking-[0.18em]", roleColors[member.role])}>{member.role}</div>
-                  </button>
-                ))}
+                <div className="flex items-center justify-between rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 w-full text-left transition-colors">
+                  <div>
+                    <div className="text-sm font-medium text-cyan-50">{authUser?.name}</div>
+                    <div className="text-xs text-cyan-200/70">{authUser?.email}</div>
+                  </div>
+                  <div className={cls("max-w-[120px] truncate rounded-full border px-2 py-1 text-[10px] uppercase tracking-[0.18em]", roleColors[authUser?.role || 'viewer'])}>{authUser?.role || 'viewer'}</div>
+                </div>
               </div>
             </div>
           </aside>

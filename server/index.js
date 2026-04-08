@@ -28,10 +28,17 @@ async function initializeDB() {
         name VARCHAR(255) NOT NULL,
         email VARCHAR(255) UNIQUE NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
+        role VARCHAR(50) DEFAULT 'viewer',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
+      );
     `);
-    console.log("Database initialized: 'users' table is ready.");
+    
+    // Non-destructive schema evolution for existing deployments
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'viewer';");
+    // Ensure the very first account holds the owner keys
+    await pool.query("UPDATE users SET role = 'owner' WHERE id = (SELECT MIN(id) FROM users);");
+    
+    console.log("Database initialized: 'users' schema mapped with RBAC.");
   } catch (error) {
     if (!process.env.DATABASE_URL) {
       console.warn("No DATABASE_URL found. Skipping Postgres DB initialization in local dev.");
@@ -57,14 +64,18 @@ app.post('/api/auth/register', async (req, res) => {
     const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) return res.status(400).json({ error: 'User already exists' });
 
+    const countResult = await pool.query('SELECT COUNT(*) FROM users');
+    const isFirstUser = parseInt(countResult.rows[0].count) === 0;
+    const role = isFirstUser ? 'owner' : 'viewer';
+
     const passwordHash = await bcrypt.hash(password, 10);
     const newUser = await pool.query(
-      'INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3) RETURNING id, name, email',
-      [name, email, passwordHash]
+      'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role',
+      [name, email, passwordHash, role]
     );
 
     const user = newUser.rows[0];
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
     
     res.json({ token, user });
   } catch (err) {
@@ -91,11 +102,56 @@ app.post('/api/auth/login', async (req, res) => {
     const validPassword = await bcrypt.compare(password, user.password_hash);
     if (!validPassword) return res.status(401).json({ error: 'Invalid credentials' });
 
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
+    const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// --- Admin Endpoints ---
+
+// Middleware to verify Admin/Owner requests
+async function requireAdmin(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Missing token' });
+
+  try {
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.role !== 'owner' && decoded.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden: Insufficient clearance' });
+    }
+    next();
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+}
+
+app.get('/api/admin/users', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, name, email, role, created_at as "lastActive", \'Active\' as status FROM users ORDER BY id ASC');
+    res.json({ users: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+app.put('/api/admin/users/:id/role', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { role } = req.body;
+  if (!['viewer', 'contributor', 'manager', 'admin', 'owner'].includes(role)) {
+    return res.status(400).json({ error: 'Invalid role' });
+  }
+  
+  try {
+    await pool.query('UPDATE users SET role = $1 WHERE id = $2', [role, id]);
+    res.json({ success: true, role });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update user role' });
   }
 });
 
