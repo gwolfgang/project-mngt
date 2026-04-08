@@ -5,7 +5,8 @@ dotenv.config();
 
 // Create a connection pool to the PostgreSQL database
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
 pool.on('error', (err, client) => {
