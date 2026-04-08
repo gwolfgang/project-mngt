@@ -2753,9 +2753,17 @@ export default function App() {
                 ))}
               </div>
             </div>
-            <div className="mt-5 flex gap-2">
+            <div className="mt-5 flex w-full gap-2">
               <button onClick={saveVendor} className="rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm text-cyan-200">Save Vendor</button>
               <button onClick={() => { setShowVendorForm(false); resetVendorDraft(); }} className="rounded-xl border border-slate-700 bg-slate-900/70 px-4 py-2 text-sm text-slate-300">Cancel</button>
+              {vendorDraft?.id && (
+                <button 
+                  onClick={() => { setVendors(prev => prev.filter(v => v.id !== vendorDraft.id)); setShowVendorForm(false); resetVendorDraft(); }} 
+                  className="ml-auto rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-sm text-rose-300 transition-colors hover:bg-rose-500/20"
+                >
+                  Delete Vendor
+                </button>
+              )}
             </div>
           </div>
         ) : null}
