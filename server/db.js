@@ -5,10 +5,11 @@ dotenv.config();
 
 // Create a connection pool to the PostgreSQL database
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  // If connecting to Render Postgres from outside, SSL is usually required.
-  // Render's internal connections do not strictly require it, but we'll enable it safely.
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  connectionString: process.env.DATABASE_URL
+});
+
+pool.on('error', (err, client) => {
+  console.error('Unexpected error on idle client', err);
 });
 
 export default pool;
