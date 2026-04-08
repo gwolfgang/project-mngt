@@ -1,5 +1,7 @@
 databases:
   - name: project-mngt-db
+    databaseName: cellforge
+    user: cellforge_user
     plan: free
 
 services:
