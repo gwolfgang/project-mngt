@@ -1826,7 +1826,20 @@ export default function App() {
                           <p className="mt-3 text-sm leading-6 text-slate-400">{node.description}</p>
                           <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-400">
                             <span className="rounded-full border border-slate-700 px-3 py-1">Owner: {node.owner}</span>
-                            <span className="rounded-full border border-slate-700 px-3 py-1">Assigned: {assignee?.name}</span>
+                            <div className="flex items-center gap-2 rounded-full border border-slate-700 px-3 py-1">
+                              <span>Assigned:</span>
+                              <select 
+                                value={node.assigneeId || ""}
+                                onChange={(e) => {
+                                  setNodes(prev => prev.map(n => n.id === node.id ? { ...n, assigneeId: e.target.value } : n));
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="bg-transparent text-white outline-none cursor-pointer"
+                              >
+                                <option value="" className="bg-slate-900 text-slate-400">Unassigned</option>
+                                {systemUsers.map(u => <option key={u.id} value={u.id} className="bg-slate-900">{u.name}</option>)}
+                              </select>
+                            </div>
                             <span className="rounded-full border border-slate-700 px-3 py-1">Tasks: {done}/{node.tasks.length}</span>
                           </div>
                           <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-800"><div className="h-full bg-cyan-300 transition-all" style={{ width: `${pct}%` }} /></div>
@@ -2145,7 +2158,7 @@ export default function App() {
                         <p className="mt-3 text-sm leading-6 text-slate-400">{node.description}</p>
                         <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-400">
                           <span className="rounded-full border border-slate-700 px-3 py-1">Owner: {node.owner}</span>
-                          <span className="rounded-full border border-slate-700 px-3 py-1">Assigned: {assignee?.name}</span>
+                          <div className="flex items-center gap-2 rounded-full border border-slate-700 px-3 py-1"><span>Assigned:</span><select value={node.assigneeId || ""} onChange={(e) => { setNodes(prev => prev.map(n => n.id === node.id ? { ...n, assigneeId: e.target.value } : n)); }} onClick={(e) => e.stopPropagation()} className="bg-transparent text-white outline-none cursor-pointer"><option value="" className="bg-slate-900 text-slate-400">Unassigned</option>{systemUsers.map(u => <option key={u.id} value={u.id} className="bg-slate-900">{u.name}</option>)}</select></div>
                           <span className="rounded-full border border-slate-700 px-3 py-1">Tasks: {done}/{node.tasks.length}</span>
                         </div>
                         <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-800">
@@ -3761,4 +3774,5 @@ export default function App() {
     </div>
   );
 }
+
 
