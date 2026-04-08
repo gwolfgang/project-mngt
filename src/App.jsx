@@ -2771,7 +2771,12 @@ export default function App() {
                     <div className="mt-2 text-sm text-slate-400">{vendor.supplyType}</div>
                     <div className="mt-1 text-sm text-slate-500">{vendor.serviceType}</div>
                   </div>
-                  <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-xs text-cyan-200">{vendor.contacts.length} contacts</div>
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-xs text-cyan-200">{vendor.contacts.length} contacts</div>
+                    <button onClick={() => { setVendorDraft(vendor); setShowVendorForm(true); }} className="rounded-xl border border-slate-700 bg-slate-800/50 p-2 text-slate-300 transition-colors hover:bg-slate-700 hover:text-white" title="Edit Vendor">
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
                 <div className="mt-4 space-y-3 text-sm text-slate-300">
                   <div><span className="text-slate-500">Address:</span> {vendor.address}</div>
@@ -3774,5 +3779,6 @@ export default function App() {
     </div>
   );
 }
+
 
 
