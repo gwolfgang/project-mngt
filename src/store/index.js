@@ -3,10 +3,18 @@ import { initialNodesConfig, initialEdgesConfig, initialVendors, initialCreative
 
 export const useStore = create((set, get) => ({
   // Auth State
-  authToken: null,
-  authUser: null,
-  setAuthToken: (token, user) => set({ authToken: token, authUser: user }),
-  logout: () => set({ authToken: null, authUser: null }),
+  authToken: (() => { try { return localStorage.getItem('vbg_token') || null; } catch { return null; } })(),
+  authUser: (() => { try { return JSON.parse(localStorage.getItem('vbg_user')) || null; } catch { return null; } })(),
+  setAuthToken: (token, user) => {
+    localStorage.setItem('vbg_token', token);
+    localStorage.setItem('vbg_user', JSON.stringify(user));
+    set({ authToken: token, authUser: user });
+  },
+  logout: () => {
+    localStorage.removeItem('vbg_token');
+    localStorage.removeItem('vbg_user');
+    set({ authToken: null, authUser: null });
+  },
 
   // App State
   activeSection: "dashboard",
