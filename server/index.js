@@ -110,6 +110,29 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// --- Generic Endpoints ---
+async function requireAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Missing token' });
+  try {
+    const token = authHeader.split(' ')[1];
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+}
+
+app.get('/api/users', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, name, email, role FROM users ORDER BY id ASC');
+    res.json({ users: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
 // --- Admin Endpoints ---
 
 // Middleware to verify Admin/Owner requests

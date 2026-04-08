@@ -5,6 +5,8 @@ export const useStore = create((set, get) => ({
   // Auth State
   authToken: (() => { try { return localStorage.getItem('vbg_token') || null; } catch { return null; } })(),
   authUser: (() => { try { return JSON.parse(localStorage.getItem('vbg_user')) || null; } catch { return null; } })(),
+  systemUsers: [],
+  setSystemUsers: (users) => set({ systemUsers: users }),
   setAuthToken: (token, user) => {
     localStorage.setItem('vbg_token', token);
     localStorage.setItem('vbg_user', JSON.stringify(user));

@@ -78,14 +78,6 @@ const roleColors = {
   viewer: "text-slate-300 border-slate-500/30 bg-slate-500/10",
 };
 
-const teamMembers = [
-  { id: "u1", name: "Executive Lead", role: "owner", email: "owner@zeusvision.com" },
-  { id: "u2", name: "Operations Manager", role: "manager", email: "ops@zeusvision.com" },
-  { id: "u3", name: "Creative Director", role: "contributor", email: "creative@zeusvision.com" },
-  { id: "u4", name: "Legal Admin", role: "admin", email: "legal@zeusvision.com" },
-  { id: "u5", name: "Read-Only Board", role: "viewer", email: "board@zeusvision.com" },
-];
-
 const projects = [
   {
     id: "cellthena",
@@ -424,7 +416,7 @@ function cls(...arr) {
 }
 
 function findMember(memberId) {
-  return teamMembers.find((m) => m.id === memberId);
+  return useStore.getState().systemUsers?.find((m) => String(m.id) === String(memberId));
 }
 
 function findNode(nodes, nodeId) {
@@ -540,7 +532,7 @@ function SidebarButton({ item, active, onClick, badge }) {
 }
 
 export default function App() {
-  const { authToken, authUser } = useStore();
+  const { authToken, authUser, systemUsers, setSystemUsers } = useStore();
   const [activeSection, setActiveSection] = useState("dashboard");
   const [nodes, setNodes] = useState(() => {
     try {
@@ -603,6 +595,16 @@ export default function App() {
         .catch(console.error);
     }
   }, [activeSection, authUser, authToken]);
+
+  // Real DB Fetch logic for all universal system users (Assignees, labels, dropdowns)
+  useEffect(() => {
+    if (authToken) {
+      fetch('/api/users', { headers: { Authorization: `Bearer ${authToken}` } })
+        .then(r => r.json())
+        .then(data => { if (data.users) setSystemUsers(data.users); })
+        .catch(console.error);
+    }
+  }, [authToken, setSystemUsers]);
   const [newUserDraft, setNewUserDraft] = useState({
     name: "",
     email: "",
@@ -825,7 +827,7 @@ export default function App() {
 
           if (nodeIndex !== -1) {
             const matchedNode = processedNodes[nodeIndex];
-            const assignee = teamMembers.find(m => m.id === assigneeQuery || m.name.toLowerCase() === assigneeQuery.toLowerCase()) || { id: "u1" };
+            const assignee = systemUsers.find(m => m.id === assigneeQuery || m.name.toLowerCase() === assigneeQuery.toLowerCase()) || { id: "u1" };
 
             const newTask = {
               id: `${matchedNode.id}-t${matchedNode.tasks.length + Math.floor(Math.random() * 1000)}`,
@@ -843,7 +845,7 @@ export default function App() {
           } else {
             // Dynamically create the missing node
             const newNodeId = `csv-n${Math.floor(Math.random() * 1000000)}`;
-            const assignee = teamMembers.find(m => m.id === assigneeQuery || m.name.toLowerCase() === assigneeQuery.toLowerCase()) || { id: "u1" };
+            const assignee = systemUsers.find(m => m.id === assigneeQuery || m.name.toLowerCase() === assigneeQuery.toLowerCase()) || { id: "u1" };
             const projectList = projectQuery ? projects.filter(p => p.name.toLowerCase().includes(projectQuery.toLowerCase())).map(p => p.id) : ["cellthena"];
             if (projectList.length === 0) projectList.push("cellthena");
 
@@ -1861,7 +1863,7 @@ export default function App() {
                       <option value="locked">locked</option>
                     </select>
                     <select value={nodeDraft.assigneeId} onChange={(e) => setNodeDraft((prev) => ({ ...prev, assigneeId: e.target.value }))} className="rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-white outline-none">
-                      {teamMembers.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+                      {systemUsers.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
                     </select>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -2228,7 +2230,7 @@ export default function App() {
                       onChange={(e) => setNodeDraft((prev) => ({ ...prev, assigneeId: e.target.value }))}
                       className="rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-white outline-none"
                     >
-                      {teamMembers.map((member) => (
+                      {systemUsers.map((member) => (
                         <option key={member.id} value={member.id}>{member.name}</option>
                       ))}
                     </select>
@@ -2380,7 +2382,7 @@ export default function App() {
                   </select>
                   <input value={taskDraft.text} onChange={(e) => setTaskDraft((prev) => ({ ...prev, text: e.target.value }))} className="rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-white outline-none xl:col-span-2" placeholder="Task name" />
                   <select value={taskDraft.assigneeId} onChange={(e) => setTaskDraft((prev) => ({ ...prev, assigneeId: e.target.value }))} className="rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-white outline-none">
-                    {teamMembers.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+                    {systemUsers.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
                   </select>
                   <input type="date" value={taskDraft.dueDate} onChange={(e) => setTaskDraft((prev) => ({ ...prev, dueDate: e.target.value }))} className="rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-white outline-none" />
                 </div>
@@ -2397,7 +2399,7 @@ export default function App() {
                 <p className="mb-4 text-sm text-slate-400">Assign all currently visible tasks to one user.</p>
                 <div className="flex flex-wrap items-center gap-3">
                   <select value={taskDraft.assigneeId} onChange={(e) => setTaskDraft((prev) => ({ ...prev, assigneeId: e.target.value }))} className="rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-white outline-none">
-                    {teamMembers.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+                    {systemUsers.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
                   </select>
                   <button onClick={bulkAssignTasks} className="rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm text-cyan-200">Assign to Visible Tasks</button>
                 </div>
@@ -3255,7 +3257,7 @@ export default function App() {
         <div className="rounded-3xl border border-slate-800 bg-slate-950/55 p-6">
           <div className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Assignee Workload</div>
           <div className="mt-4 space-y-3">
-            {teamMembers.map((member) => {
+            {systemUsers.map((member) => {
               const assigned = nodes.flatMap((n) => n.tasks).filter((t) => t.assigneeId === member.id).length;
               const done = nodes.flatMap((n) => n.tasks).filter((t) => t.assigneeId === member.id && t.done).length;
               const pct = assigned ? Math.round((done / assigned) * 100) : 0;
@@ -3759,3 +3761,4 @@ export default function App() {
     </div>
   );
 }
+
