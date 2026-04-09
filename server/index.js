@@ -31,6 +31,14 @@ async function initializeDB() {
         role VARCHAR(50) DEFAULT 'viewer',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+      CREATE TABLE IF NOT EXISTS auth_logs (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) NOT NULL,
+        event VARCHAR(50) NOT NULL,
+        status VARCHAR(50) NOT NULL,
+        ip_address VARCHAR(255),
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `);
     
     // Non-destructive schema evolution for existing deployments
@@ -48,6 +56,19 @@ async function initializeDB() {
   }
 }
 initializeDB();
+
+async function logAuthEvent(email, event, status, req) {
+  if (!process.env.DATABASE_URL) return;
+  try {
+    const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
+    await pool.query(
+      'INSERT INTO auth_logs (email, event, status, ip_address) VALUES ($1, $2, $3, $4)',
+      [email, event, status, ip]
+    );
+  } catch (err) {
+    console.error('Auth logging error:', err);
+  }
+}
 
 // --- State Endpoints ---
 
@@ -82,7 +103,10 @@ app.post('/api/state/:key', requireAuth, async (req, res) => {
 
 app.post('/api/auth/register', async (req, res) => {
   const { name, email, password } = req.body;
-  if (!name || !email || !password) return res.status(400).json({ error: 'Missing fields' });
+  if (!name || !email || !password) {
+    await logAuthEvent(email || 'unknown', 'REGISTER', 'FAILED_MISSING_FIELDS', req);
+    return res.status(400).json({ error: 'Missing fields' });
+  }
 
   try {
     // If no DB URL is provided, we can't register for real
@@ -91,7 +115,23 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-    if (existingUser.rows.length > 0) return res.status(400).json({ error: 'User already exists' });
+    if (existingUser.rows.length > 0) {
+      const user = existingUser.rows[0];
+      // Check if user was pre-created by an admin and hasn't claimed their account yet
+      if (user.password_hash === 'UNCLAIMED') {
+        const passwordHash = await bcrypt.hash(password, 10);
+        await pool.query(
+          'UPDATE users SET name = $1, password_hash = $2 WHERE id = $3',
+          [name, passwordHash, user.id]
+        );
+        const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+        await logAuthEvent(email, 'REGISTER_CLAIM', 'SUCCESS', req);
+        return res.json({ token, user: { id: user.id, name, email: user.email, role: user.role } });
+      } else {
+        await logAuthEvent(email, 'REGISTER', 'FAILED_USER_EXISTS', req);
+        return res.status(400).json({ error: 'User already exists and is active' });
+      }
+    }
 
     const countResult = await pool.query('SELECT COUNT(*) FROM users');
     const isFirstUser = parseInt(countResult.rows[0].count) === 0;
@@ -106,9 +146,11 @@ app.post('/api/auth/register', async (req, res) => {
     const user = newUser.rows[0];
     const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
     
+    await logAuthEvent(email, 'REGISTER', 'SUCCESS', req);
     res.json({ token, user });
   } catch (err) {
     console.error(err);
+    await logAuthEvent(email || 'unknown', 'REGISTER', 'FAILED_SYSTEM_ERROR', req);
     res.status(500).json({ error: 'Registration failed' });
   }
 });
@@ -126,15 +168,23 @@ app.post('/api/auth/login', async (req, res) => {
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     const user = result.rows[0];
 
-    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!user) {
+      await logAuthEvent(email || 'unknown', 'LOGIN', 'FAILED_INVALID_USER', req);
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
 
     const validPassword = await bcrypt.compare(password, user.password_hash);
-    if (!validPassword) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!validPassword) {
+      await logAuthEvent(email, 'LOGIN', 'FAILED_INVALID_PASSWORD', req);
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
 
     const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    await logAuthEvent(email, 'LOGIN', 'SUCCESS', req);
     res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   } catch (err) {
     console.error(err);
+    await logAuthEvent(email || 'unknown', 'LOGIN', 'FAILED_SYSTEM_ERROR', req);
     res.status(500).json({ error: 'Login failed' });
   }
 });
@@ -209,13 +259,17 @@ app.put('/api/admin/users/:id/role', requireAdmin, async (req, res) => {
 
 app.post('/api/admin/users', requireAdmin, async (req, res) => {
   const { name, email, password, role } = req.body;
-  if (!name || !email || !password || !role) return res.status(400).json({ error: 'Missing fields' });
+  
+  // Password is optional when an admin creates a user (they will claim it later)
+  if (!name || !email || !role) return res.status(400).json({ error: 'Missing fields' });
 
   try {
     const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) return res.status(400).json({ error: 'User already exists' });
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    // If password provided, hash it, otherwise use 'UNCLAIMED'
+    const passwordHash = password ? await bcrypt.hash(password, 10) : 'UNCLAIMED';
+    
     const newUser = await pool.query(
       'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id',
       [name, email, passwordHash, role]
@@ -225,6 +279,30 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Creation failed' });
+  }
+});
+
+app.post('/api/admin/users/:id/reset', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query("UPDATE users SET password_hash = 'UNCLAIMED' WHERE id = $1", [id]);
+    res.json({ success: true, message: 'User password reset to UNCLAIMED' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to reset user password' });
+  }
+});
+
+app.get('/api/admin/auth-logs', requireAdmin, async (req, res) => {
+  if (req.user.role !== 'owner') {
+    return res.status(403).json({ error: 'Forbidden: Owner clearance required' });
+  }
+  try {
+    const result = await pool.query('SELECT id, email, event, status, ip_address, timestamp FROM auth_logs ORDER BY timestamp DESC LIMIT 100');
+    res.json({ logs: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch auth logs' });
   }
 });
 

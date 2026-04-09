@@ -54,6 +54,8 @@ import {
   Save,
   X,
   FileSpreadsheet,
+  RotateCcw,
+  LogOut,
 } from "lucide-react";
 
 const appSections = [
@@ -538,7 +540,7 @@ export default function App() {
     if (!token || !isHydratedRef.current) return;
     fetch('/api/state/' + key, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(data) }).catch(console.error);
   };
-  const { authToken, authUser, systemUsers, setSystemUsers } = useStore();
+  const { authToken, authUser, systemUsers, setSystemUsers, logout } = useStore();
   const [activeSection, setActiveSection] = useState("dashboard");
   const [nodes, setNodes] = useState(() => {
     try {
@@ -597,6 +599,7 @@ export default function App() {
   });
   const [adminView, setAdminView] = useState("users");
   const [adminUsers, setAdminUsers] = useState([]);
+  const [authLogs, setAuthLogs] = useState([]);
   
   // Real DB Fetch logic for admin
   useEffect(() => {
@@ -605,8 +608,15 @@ export default function App() {
         .then(r => r.json())
         .then(data => { if (data.users) setAdminUsers(data.users); })
         .catch(console.error);
+
+      if (adminView === 'logs' && authUser?.role === "owner") {
+        fetch('/api/admin/auth-logs', { headers: { Authorization: `Bearer ${authToken}` } })
+          .then(r => r.json())
+          .then(data => { if (data.logs) setAuthLogs(data.logs); })
+          .catch(console.error);
+      }
     }
-  }, [activeSection, authUser, authToken]);
+  }, [activeSection, authUser, authToken, adminView]);
 
   // Real DB Fetch logic for all universal system users (Assignees, labels, dropdowns)
   useEffect(() => {
@@ -3401,6 +3411,24 @@ export default function App() {
       setAdminUsers((prev) => prev.filter((user) => user.id !== userId));
     };
 
+    const resetAdminUser = async (userId) => {
+      if (!confirm("Are you sure you want to reset this user's password? This will force them to re-register/claim their account.")) return;
+      try {
+        const res = await fetch(`/api/admin/users/${userId}/reset`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+          alert('User password has been reverted to UNCLAIMED successfully. They can now claim the account again on the Registration page.');
+        } else {
+          const err = await res.json();
+          alert(`Failed to reset: ${err.error || 'Unknown error'}`);
+        }
+      } catch (e) {
+        console.error("Reset failed", e);
+      }
+    };
+
     const cycleUserRole = async (userId) => {
       const order = ["viewer", "contributor", "manager", "admin"];
       const user = adminUsers.find(u => u.id === userId);
@@ -3468,6 +3496,11 @@ export default function App() {
             <button onClick={() => setAdminView("create")} className={cls("rounded-xl px-4 py-2 text-sm", adminView === "create" ? "border border-cyan-400 bg-cyan-400/10 text-cyan-200" : "border border-slate-700 bg-slate-900/70 text-slate-300")}>
               Create User
             </button>
+            {authUser?.role === "owner" && (
+              <button onClick={() => setAdminView("logs")} className={cls("rounded-xl px-4 py-2 text-sm", adminView === "logs" ? "border border-amber-400 bg-amber-400/10 text-amber-200" : "border border-slate-700 bg-slate-900/70 text-slate-300")}>
+                Security Logs
+              </button>
+            )}
           </div>
           <div className="rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-slate-300">
             Signed in as {currentUser?.name} · {currentUser?.role}
@@ -3507,6 +3540,9 @@ export default function App() {
                     <div className="text-sm text-slate-300">{user.status}</div>
                     <div className="text-sm text-slate-400">{user.lastActive}</div>
                     <div className="flex justify-end gap-2">
+                      <button onClick={() => resetAdminUser(user.id)} className="rounded-xl border border-amber-400/25 bg-amber-400/10 p-2 text-amber-200" title="Reset user password">
+                        <RotateCcw className="h-4 w-4" />
+                      </button>
                       <button onClick={() => cycleUserRole(user.id)} className="rounded-xl border border-cyan-400/25 bg-cyan-400/10 p-2 text-cyan-200" title="Cycle role">
                         <Pencil className="h-4 w-4" />
                       </button>
@@ -3552,7 +3588,7 @@ export default function App() {
               </div>
             </div>
           </div>
-        ) : (
+        ) : adminView === "create" ? (
           <div className="space-y-6">
             <div className="rounded-3xl border border-cyan-400/15 bg-slate-950/55 p-5 shadow-2xl">
               <div className="mb-4 flex items-center justify-between gap-4">
@@ -3616,7 +3652,37 @@ export default function App() {
               </div>
             </div>
           </div>
-        )}
+        ) : adminView === "logs" && authUser?.role === "owner" ? (
+          <div className="space-y-6">
+            <div className="rounded-3xl border border-amber-400/15 bg-slate-950/55 p-5 shadow-2xl">
+              <div className="mb-4 text-[10px] uppercase tracking-[0.35em] text-amber-300">Authentication Telemetry</div>
+              <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/60">
+                <div className="grid grid-cols-[1.2fr_0.8fr_0.8fr_1fr] border-b border-slate-800 px-5 py-4 text-[11px] uppercase tracking-[0.3em] text-slate-500">
+                  <div>Timestamp</div>
+                  <div>Status</div>
+                  <div>IP Address</div>
+                  <div>Email Match</div>
+                </div>
+                {authLogs.length === 0 ? (
+                  <div className="p-8 text-center text-sm text-slate-500">No telemetry records captured yet.</div>
+                ) : (
+                  authLogs.map((log) => (
+                    <div key={log.id} className="grid grid-cols-[1.2fr_0.8fr_0.8fr_1fr] items-center border-b border-slate-800 px-5 py-4 last:border-b-0">
+                      <div className="text-xs text-slate-400">{new Date(log.timestamp).toLocaleString()}</div>
+                      <div>
+                        <span className={cls("rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.2em]", log.status === "SUCCESS" ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300" : "border-rose-400/30 bg-rose-400/10 text-rose-300")}>
+                          {log.event}
+                        </span>
+                      </div>
+                      <div className="font-mono text-xs text-slate-500">{log.ip_address || "Unknown"}</div>
+                      <div className="truncate text-xs text-slate-300">{log.email}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     );
   };
@@ -3789,12 +3855,15 @@ export default function App() {
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 w-full text-left transition-colors">
-                  <div>
-                    <div className="text-sm font-medium text-cyan-50">{authUser?.name}</div>
-                    <div className="text-xs text-cyan-200/70">{authUser?.email}</div>
+                  <div className="truncate pr-2">
+                    <div className="truncate text-sm font-medium text-cyan-50">{authUser?.name}</div>
+                    <div className="truncate text-xs text-cyan-200/70">{authUser?.email}</div>
                   </div>
-                  <div className={cls("max-w-[120px] truncate rounded-full border px-2 py-1 text-[10px] uppercase tracking-[0.18em]", roleColors[authUser?.role || 'viewer'])}>{authUser?.role || 'viewer'}</div>
+                  <div className={cls("shrink-0 max-w-[80px] truncate rounded-full border px-2 py-1 text-[8px] uppercase tracking-[0.15em]", roleColors[authUser?.role || 'viewer'])}>{authUser?.role || 'viewer'}</div>
                 </div>
+                <button onClick={logout} className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-300 transition-colors hover:bg-rose-500/20">
+                  <LogOut className="h-4 w-4" /> Sign Out
+                </button>
               </div>
             </div>
           </aside>
