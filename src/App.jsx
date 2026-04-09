@@ -532,6 +532,12 @@ function SidebarButton({ item, active, onClick, badge }) {
 }
 
 export default function App() {
+  const isHydratedRef = useRef(false);
+  const syncToDb = (key, data) => {
+    const token = useStore.getState().authToken;
+    if (!token || !isHydratedRef.current) return;
+    fetch('/api/state/' + key, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(data) }).catch(console.error);
+  };
   const { authToken, authUser, systemUsers, setSystemUsers } = useStore();
   const [activeSection, setActiveSection] = useState("dashboard");
   const [nodes, setNodes] = useState(() => {
@@ -554,11 +560,17 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem("vbg_nodes", JSON.stringify(nodes));
+    localStorage.setItem('vbg_nodes', JSON.stringify(nodes));
+    if (!isHydratedRef.current) return;
+    const t = setTimeout(() => syncToDb('nodes', nodes), 500);
+    return () => clearTimeout(t);
   }, [nodes]);
 
   useEffect(() => {
-    localStorage.setItem("vbg_edges", JSON.stringify(edges));
+    localStorage.setItem('vbg_edges', JSON.stringify(edges));
+    if (!isHydratedRef.current) return;
+    const t = setTimeout(() => syncToDb('edges', edges), 500);
+    return () => clearTimeout(t);
   }, [edges]);
   const [selectedId, setSelectedId] = useState("cellthena-n1");
   const [query, setQuery] = useState("");
@@ -785,8 +797,16 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem("vbg_creativeReviewItems", JSON.stringify(creativeReviewItems));
+    localStorage.setItem('vbg_creativeReviewItems', JSON.stringify(creativeReviewItems));
+    if (!isHydratedRef.current) return;
+    const t = setTimeout(() => syncToDb('creativeReviewItems', creativeReviewItems), 500);
+    return () => clearTimeout(t);
   }, [creativeReviewItems]);
+  useEffect(() => {
+    if (!isHydratedRef.current) return;
+    const t = setTimeout(() => syncToDb('vendors', vendors), 500);
+    return () => clearTimeout(t);
+  }, [vendors]);
 
   const graphRef = useRef(null);
   const csvInputRef = useRef(null);
@@ -3787,6 +3807,11 @@ export default function App() {
     </div>
   );
 }
+
+
+
+
+
 
 
 

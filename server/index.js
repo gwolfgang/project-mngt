@@ -23,7 +23,7 @@ app.use(express.json());
 async function initializeDB() {
   try {
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
+      CREATE TABLE IF NOT EXISTS app_state ( key VARCHAR(255) PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ); CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         email VARCHAR(255) UNIQUE NOT NULL,
@@ -48,6 +48,35 @@ async function initializeDB() {
   }
 }
 initializeDB();
+
+// --- State Endpoints ---
+
+app.get('/api/state/:key', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT data FROM app_state WHERE key = $1', [req.params.key]);
+    if (result.rows.length > 0) {
+      res.json(result.rows[0].data);
+    } else {
+      res.status(404).json({ error: 'Key not found' });
+    }
+  } catch (err) {
+    console.error('Fetch State Error:', err);
+    res.status(500).json({ error: 'Failed to fetch state' });
+  }
+});
+
+app.post('/api/state/:key', requireAuth, async (req, res) => {
+  try {
+    await pool.query(
+      'INSERT INTO app_state (key, data) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data, updated_at = CURRENT_TIMESTAMP',
+      [req.params.key, JSON.stringify(req.body)]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Save State Error:', err);
+    res.status(500).json({ error: 'Failed to save state' });
+  }
+});
 
 // --- Auth Endpoints ---
 
@@ -215,3 +244,4 @@ if (process.env.NODE_ENV === 'production') {
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
