@@ -1265,16 +1265,18 @@ export default function App() {
 
   const saveVendor = () => {
     if (!vendorDraft.name.trim()) return;
-    const stamp = Math.floor(Math.random() * 9000 + 1000);
-    setVendors((prev) => [
-      {
-        id: `v-${stamp}`,
-        ...vendorDraft,
-        name: vendorDraft.name.trim(),
-        contacts: vendorDraft.contacts.filter((contact) => contact.name || contact.email || contact.phone),
-      },
-      ...prev,
-    ]);
+    const updatedVendor = {
+      ...vendorDraft,
+      name: vendorDraft.name.trim(),
+      contacts: vendorDraft.contacts.filter((contact) => contact.name || contact.email || contact.phone),
+    };
+    const isEditing = vendorDraft.id && vendors.some((v) => v.id === vendorDraft.id);
+    if (isEditing) {
+      setVendors((prev) => prev.map((v) => v.id === vendorDraft.id ? { ...v, ...updatedVendor } : v));
+    } else {
+      const stamp = Math.floor(Math.random() * 9000 + 1000);
+      setVendors((prev) => [{ id: `v-${stamp}`, ...updatedVendor }, ...prev]);
+    }
     setShowVendorForm(false);
     setVendorDraft({
       name: "",
