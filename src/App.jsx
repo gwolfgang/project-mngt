@@ -676,8 +676,14 @@ export default function App() {
       { id: "c1", name: "", title: "", email: "", phone: "" },
     ],
   });
-  const [vendors, setVendors] = useState([
-
+  const [vendors, setVendors] = useState(() => {
+    try {
+      const saved = localStorage.getItem("vbg_vendors");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error("Failed to parse saved vendors", e);
+    }
+    return [
     {
       id: "v1",
       name: "NutraBlend Labs",
@@ -685,7 +691,7 @@ export default function App() {
       supplyType: "Supplement formulation and bottling",
       serviceType: "Contract manufacturing",
       address: "1450 Industry Way, Anaheim, CA 92806",
-      notes: "Primary candidate for women’s line encapsulation and label application.",
+      notes: "Primary candidate for women's line encapsulation and label application.",
       bankName: "Bank of America",
       beneficiary: "NutraBlend Labs LLC",
       routingNumber: "026009593",
@@ -715,7 +721,8 @@ export default function App() {
         { id: "v2c1", name: "Aaron Blake", title: "Sales Director", email: "aaron@primebottle.com", phone: "(972) 555-0172" },
       ],
     },
-  ]);
+  ];
+  });
   const [creativeReviewProject, setCreativeReviewProject] = useState("cellthena");
   const [creativeReviewFilter, setCreativeReviewFilter] = useState("all");
   const [creativeReviewView, setCreativeReviewView] = useState("grid");
@@ -813,6 +820,7 @@ export default function App() {
     return () => clearTimeout(t);
   }, [creativeReviewItems]);
   useEffect(() => {
+    localStorage.setItem('vbg_vendors', JSON.stringify(vendors));
     if (!isHydratedRef.current) return;
     const t = setTimeout(() => syncToDb('vendors', vendors), 500);
     return () => clearTimeout(t);
