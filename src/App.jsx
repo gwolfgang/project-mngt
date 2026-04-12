@@ -683,45 +683,7 @@ export default function App() {
     } catch (e) {
       console.error("Failed to parse saved vendors", e);
     }
-    return [
-    {
-      id: "v1",
-      name: "NutraBlend Labs",
-      projectId: "cellthena",
-      supplyType: "Supplement formulation and bottling",
-      serviceType: "Contract manufacturing",
-      address: "1450 Industry Way, Anaheim, CA 92806",
-      notes: "Primary candidate for women's line encapsulation and label application.",
-      bankName: "Bank of America",
-      beneficiary: "NutraBlend Labs LLC",
-      routingNumber: "026009593",
-      accountNumber: "****4821",
-      swiftCode: "BOFAUS3N",
-      wireNotes: "Use PO number in wire memo field.",
-      contacts: [
-        { id: "v1c1", name: "Melissa Grant", title: "Account Executive", email: "mgrant@nutrablend.com", phone: "(714) 555-0183" },
-        { id: "v1c2", name: "Jose Rivera", title: "Plant Manager", email: "jrivera@nutrablend.com", phone: "(714) 555-0114" },
-      ],
-    },
-    {
-      id: "v2",
-      name: "Prime Bottle Works",
-      projectId: "cellforge",
-      supplyType: "Bottles, caps, shrink bands",
-      serviceType: "Packaging supply",
-      address: "882 Commerce Blvd, Dallas, TX 75207",
-      notes: "Fast lead times for black matte bottles and tamper-evident seals.",
-      bankName: "Wells Fargo",
-      beneficiary: "Prime Bottle Works Inc.",
-      routingNumber: "121000248",
-      accountNumber: "****1934",
-      swiftCode: "WFBIUS6S",
-      wireNotes: "Email remittance advice after payment.",
-      contacts: [
-        { id: "v2c1", name: "Aaron Blake", title: "Sales Director", email: "aaron@primebottle.com", phone: "(972) 555-0172" },
-      ],
-    },
-  ];
+    return [];
   });
   const [creativeReviewProject, setCreativeReviewProject] = useState("cellthena");
   const [creativeReviewFilter, setCreativeReviewFilter] = useState("all");
